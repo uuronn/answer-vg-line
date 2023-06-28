@@ -73,7 +73,8 @@ const textEventHandler = async (
     await updateDoc(usesDocRef, {
       isPlay: true,
       prevQuestion,
-      questionCount: usesDocSnap.data().questionCount + 1
+      questionCount: 0,
+      missCount: 0
     });
 
     return client.replyMessage(replyToken, [
@@ -142,7 +143,7 @@ const textEventHandler = async (
     ]);
   } else {
     await updateDoc(usesDocRef, {
-      missCount: usesDocSnap.data().miss + 1
+      missCount: usesDocSnap.data().missCount + 1
     });
     return client.replyMessage(replyToken, [
       {
