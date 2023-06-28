@@ -41,12 +41,12 @@ const textEventHandler = async (
     return;
   }
 
-  const prevQuestionDocRef = doc(db, "uses", "test");
+  const usesDocRef = doc(db, "uses", "test");
   const docRef = doc(db, "vg", "vg-list");
-  const prevQuestionDocSnap = await getDoc(prevQuestionDocRef);
+  const usesDocSnap = await getDoc(usesDocRef);
   const docSnap = await getDoc(docRef);
 
-  if (!prevQuestionDocSnap.exists()) return;
+  if (!usesDocSnap.exists()) return;
   if (!docSnap.exists()) return;
 
   const prevQuestion =
@@ -56,29 +56,79 @@ const textEventHandler = async (
 
   const { replyToken } = event;
 
-  switch (event.message.text) {
-    case "スタート":
-      await updateDoc(prevQuestionDocRef, {
-        prevQuestion
-      });
+  if (event.message.text !== "スタート") {
+    if (!usesDocSnap.data().isPlay) {
+      if (event.message.text) {
+        return client.replyMessage(replyToken, [
+          {
+            type: "text",
+            text: "「スタート」でゲームを開始できるよ！"
+          }
+        ]);
+      }
+    }
+  }
 
-      return client.replyMessage(replyToken, {
+  if (event.message.text === "スタート") {
+    await updateDoc(usesDocRef, {
+      isPlay: true,
+      prevQuestion,
+      questionCount: usesDocSnap.data().questionCount + 1
+    });
+
+    return client.replyMessage(replyToken, [
+      { type: "text", text: "ゲーム開始！" },
+      {
         type: "image",
         originalContentUrl: prevQuestion.imageUrl,
         previewImageUrl: prevQuestion.imageUrl
-      });
+      }
+    ]);
   }
 
-  if (prevQuestionDocSnap.data().prevQuestion.name === event.message.text) {
+  if (usesDocSnap.data().prevQuestion.name === event.message.text) {
     const newPrevQuestion =
       docSnap.data().vgList[
         Math.floor(Math.random() * docSnap.data().vgList.length)
       ];
 
-    await updateDoc(prevQuestionDocRef, {
-      prevQuestion: newPrevQuestion
+    await updateDoc(usesDocRef, {
+      prevQuestion: newPrevQuestion,
+      questionCount: usesDocSnap.data().questionCount + 1
     });
 
+    if (usesDocSnap.data().questionCount + 1 === 5) {
+      await updateDoc(usesDocRef, {
+        isPlay: false,
+        questionCount: 0,
+        missCount: 0
+      });
+
+      return client.replyMessage(replyToken, [
+        {
+          type: "text",
+          text: "終了！"
+        },
+        {
+          type: "text",
+          text:
+            usesDocSnap.data().missCount === 0
+              ? "評価 A（ばりぐっど）"
+              : usesDocSnap.data().missCount === 1
+              ? "評価 B"
+              : "評価 C（ばりばっど）"
+        },
+        {
+          type: "text",
+          text:
+            usesDocSnap.data().missCount === 0
+              ? "あなたはばりぐっどばりぐっど大学にふさわしい人材です！！\nこれからも活動頑張ってください！！"
+              : usesDocSnap.data().missCount === 1
+              ? "あなたはばりぐっどばりぐっど大学にふさわしい人材です！"
+              : "あなたがばりぐっど大学を退学させられる日も近いかもしれません。。"
+        }
+      ]);
+    }
     return client.replyMessage(replyToken, [
       {
         type: "text",
@@ -91,6 +141,9 @@ const textEventHandler = async (
       }
     ]);
   } else {
+    await updateDoc(usesDocRef, {
+      missCount: usesDocSnap.data().miss + 1
+    });
     return client.replyMessage(replyToken, [
       {
         type: "text",
